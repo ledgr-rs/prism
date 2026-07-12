@@ -1,109 +1,91 @@
 # Prism
 
-> Explainable model routing for AI applications.
+> An explainable decision engine for model routing.
 
-Prism separates routing from execution by making model selection explicit,
-policy-driven, and explainable.
-
----
+Prism separates routing from execution, allowing applications to choose the right model through explicit capabilities, policies, and transparent decisions.
 
 <p align="center">
-  <img src="docs/assets/architecture1.png" alt="Prism Architecture" width="900" />
+  <img src="docs/assets/architecture1.png" alt="Prism Architecture" width="900">
 </p>
 
 ---
 
-## The Problem
+## Why Prism?
 
-Modern AI applications rarely use a single model.
+Modern AI applications rarely rely on a single model.
 
-Applications today embed routing logic directly into business code.
+As providers and models grow, routing logic gradually spreads throughout the application:
 
 - provider-specific conditionals
 - capability checks
 - latency heuristics
 - cost thresholds
-- fallbacks
+- fallback chains
 
-As providers grow, routing becomes increasingly difficult to understand and maintain.
+What begins as a few `if` statements eventually becomes infrastructure that is difficult to reason about, extend, and test.
+
+Routing is a system of its own. Prism treats it that way.
 
 ---
 
-## Our Approach
-
-Prism treats routing as its own system.
+## How It Works
 
 Instead of asking:
 
-"Which provider should I call?"
+> Which provider should I call?
 
-Applications describe what they need.
+Applications describe **what they need**.
 
-Prism
+Prism then:
 
-- analyzes the request
-- matches required capabilities
-- evaluates routing policies
-- selects the best execution target
-- explains the decision
+1. analyzes the request
+2. identifies the required capabilities
+3. evaluates routing policies
+4. selects the best execution target
+5. explains the decision
 
 Execution is optional.
 
-Prism can simply recommend a model or execute the request through provider adapters.
+Prism can either recommend a model or execute the request through provider adapters.
 
 ---
 
-## Principles
+## Core Ideas
 
-### Explainable
+### Routing is independent
 
-Every routing decision should be inspectable.
+Model selection should not be coupled to application logic.
 
-### Capability Driven
+### Decisions should be explainable
 
-Applications depend on capabilities, not vendors.
+Every routing decision should be inspectable and reproducible.
 
-### Policy First
+### Policies drive routing
 
-Cost, latency, privacy and governance are configurable.
+Cost, latency, privacy, governance, and organization-specific rules determine how routing decisions are made.
 
-### Provider Agnostic
+### Providers are interchangeable
 
-Providers are plugins.
-
-Applications never depend on vendor APIs.
-
----
-
-## Architecture
-
-The routing pipeline consists of six stages.
-
-
-
----
-
-## Getting Started
-
-Coming soon.
+Applications depend on capabilities rather than vendor-specific APIs.
 
 ---
 
 ## Roadmap
 
 - Core routing engine
-- Provider registry
+- Capability registry
 - Policy framework
+- Provider adapters
 - SDKs
-- Benchmarks
+- Benchmark suite
 
 ---
 
 ## Contributing
 
-Contributions are welcome.
+We welcome contributions from the community.
 
-See `CONTRIBUTING.md`.
+See **CONTRIBUTING.md** for setup instructions and contribution guidelines.
 
 ---
 
