@@ -8,7 +8,7 @@ policy-driven, and explainable.
 ---
 
 <p align="center">
-  <img src="docs/assets/architecture.png" alt="Prism Architecture" width="900" />
+  <img src="docs/assets/architecture1.png" alt="Prism Architecture" width="900" />
 </p>
 
 ---
