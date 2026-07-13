@@ -89,6 +89,4 @@ See **CONTRIBUTING.md** for setup instructions and contribution guidelines.
 
 ---
 
-## License
 
-MIT
