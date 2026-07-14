@@ -1,7 +1,9 @@
 pub mod analysis;
 pub mod capability;
+pub mod derived;
 pub mod explanation;
 pub mod filtering;
+pub mod intrinsic;
 pub mod normalization;
 pub mod policy;
 pub mod scoring;
