@@ -9,19 +9,22 @@ pub mod policy;
 pub mod scoring;
 pub mod selection;
 
-pub use analysis::PromptAnalyzer;
+pub use analysis::PromptProfile;
 pub use capability::CapabilityExtractor;
+pub use derived::DerivedAnalyzer;
 pub use explanation::ExplanationGenerator;
 pub use filtering::CandidateFiltering;
+pub use intrinsic::IntrinsicExtractor;
 pub use normalization::Normalizer;
 pub use policy::PolicyEvaluator;
 pub use scoring::CandidateScorer;
 pub use selection::DecisionSelector;
 
-pub use analysis::DefaultPromptAnalyzer;
 pub use capability::DefaultCapabilityExtractor;
+pub use derived::DefaultDerivedAnalyzer;
 pub use explanation::DefaultExplanationGenerator;
 pub use filtering::DefaultCandidateFiltering;
+pub use intrinsic::DefaultIntrinsicExtractor;
 pub use normalization::DefaultNormalizer;
 pub use policy::DefaultPolicyEvaluator;
 pub use scoring::DefaultCandidateScorer;

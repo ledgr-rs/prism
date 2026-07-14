@@ -11,7 +11,8 @@ use crate::stages::*;
 /// The engine never owns or discovers models — the caller supplies them.
 pub struct DecisionEngine {
     normalizer: Box<dyn Normalizer>,
-    prompt_analyzer: Box<dyn PromptAnalyzer>,
+    intrinsic_extractor: Box<dyn IntrinsicExtractor>,
+    derived_analyzer: Box<dyn DerivedAnalyzer>,
     capability_extractor: Box<dyn CapabilityExtractor>,
     candidate_filtering: Box<dyn CandidateFiltering>,
     policy_evaluator: Box<dyn PolicyEvaluator>,
@@ -33,28 +34,34 @@ impl DecisionEngine {
         // 1. Normalization
         let normalized = self.normalizer.normalize(prompt)?;
 
-        // 2. Prompt Analysis
-        let profile = self.prompt_analyzer.analyze(&normalized)?;
+        // 2. Intrinsic Extraction (observable facts)
+        let intrinsic = self.intrinsic_extractor.extract(&normalized)?;
 
-        // 3. Capability Extraction
+        // 3. Derived Analysis (inferred conclusions)
+        let derived = self.derived_analyzer.analyze(&intrinsic)?;
+
+        // 4. Construct PromptProfile
+        let profile = PromptProfile { intrinsic, derived };
+
+        // 5. Capability Extraction
         let capabilities = self.capability_extractor.extract(&profile)?;
 
-        // 4. Candidate Filtering (models supplied by caller)
+        // 6. Candidate Filtering (models supplied by caller)
         let candidates = self.candidate_filtering.filter(available_models.to_vec(), &capabilities)?;
 
-        // 5. Policy Evaluation
+        // 7. Policy Evaluation
         let approved = self.policy_evaluator.evaluate(candidates, &capabilities, policy)?;
 
-        // 6. Candidate Scoring
+        // 8. Candidate Scoring
         let scored = self.candidate_scorer.score(approved, &capabilities)?;
 
-        // 7. Decision Selection
+        // 9. Decision Selection
         let recommendation = self.decision_selector.select(scored)?;
 
-        // 8. Explanation Generation
+        // 10. Explanation Generation
         let explanation = self.explanation_generator.generate(&recommendation, &capabilities)?;
 
-        // 9. Decision Report
+        // 11. Decision Report
         Ok(DecisionReport {
             prompt: prompt.clone(),
             capabilities,
@@ -68,7 +75,8 @@ impl Default for DecisionEngine {
     fn default() -> Self {
         Self {
             normalizer: Box::new(DefaultNormalizer),
-            prompt_analyzer: Box::new(DefaultPromptAnalyzer),
+            intrinsic_extractor: Box::new(DefaultIntrinsicExtractor),
+            derived_analyzer: Box::new(DefaultDerivedAnalyzer),
             capability_extractor: Box::new(DefaultCapabilityExtractor),
             candidate_filtering: Box::new(DefaultCandidateFiltering),
             policy_evaluator: Box::new(DefaultPolicyEvaluator),
@@ -164,7 +172,6 @@ mod tests {
 
         let report = engine.evaluate(&prompt, &models, &policy).unwrap();
 
-        // model-c has coding + reasoning, best match for "coding"
         assert_eq!(report.recommendation.model.id, "model-c");
         assert!(report.recommendation.score > 0.0);
     }

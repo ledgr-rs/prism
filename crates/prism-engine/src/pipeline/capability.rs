@@ -14,7 +14,7 @@ pub struct DefaultCapabilityExtractor;
 
 impl CapabilityExtractor for DefaultCapabilityExtractor {
     fn extract(&self, profile: &PromptProfile) -> Result<CapabilityProfile, PrismError> {
-        let text = profile.text.to_lowercase();
+        let text = profile.intrinsic.text.to_lowercase();
         let mut requirements = Vec::new();
 
         if text.contains("code") || text.contains("program") || text.contains("function") {
