@@ -1,5 +1,5 @@
 pub mod capability;
-pub use capability::CapabilityProfile;
+pub use capability::{Capability, CapabilityProfile, CapabilityRequirement, Priority};
 
 pub mod explanation;
 pub use explanation::Explanation;
