@@ -26,7 +26,7 @@ impl CandidateScorer for DefaultCandidateScorer {
                 let overlap = capabilities
                     .requirements
                     .iter()
-                    .filter(|req| model.capabilities.contains(req))
+                    .filter(|req| model.capabilities.contains(&req.capability.to_string()))
                     .count();
                 (model, overlap as f64)
             })

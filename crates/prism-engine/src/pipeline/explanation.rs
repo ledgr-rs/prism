@@ -23,8 +23,8 @@ impl ExplanationGenerator for DefaultExplanationGenerator {
         let reasons: Vec<String> = capabilities
             .requirements
             .iter()
-            .filter(|req| recommendation.model.capabilities.contains(req))
-            .map(|req| format!("supports '{}'", req))
+            .filter(|req| recommendation.model.capabilities.contains(&req.capability.to_string()))
+            .map(|req| format!("supports '{}'", req.capability))
             .collect();
 
         let reasoning = if reasons.is_empty() {

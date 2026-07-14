@@ -13,7 +13,9 @@ pub struct DecisionEngine {
     normalizer: Box<dyn Normalizer>,
     intrinsic_extractor: Box<dyn IntrinsicExtractor>,
     derived_analyzer: Box<dyn DerivedAnalyzer>,
-    capability_extractor: Box<dyn CapabilityExtractor>,
+    requirement_inferer: Box<dyn RequirementInferer>,
+    capability_mapper: Box<dyn CapabilityMapper>,
+    capability_prioritizer: Box<dyn CapabilityPrioritizer>,
     candidate_filtering: Box<dyn CandidateFiltering>,
     policy_evaluator: Box<dyn PolicyEvaluator>,
     candidate_scorer: Box<dyn CandidateScorer>,
@@ -43,28 +45,38 @@ impl DecisionEngine {
         // 4. Construct PromptProfile
         let profile = PromptProfile { intrinsic, derived };
 
-        // 5. Capability Extraction
-        let capabilities = self.capability_extractor.extract(&profile)?;
+        // 5. Requirement Inference
+        let requirements = self.requirement_inferer.infer(&profile)?;
 
-        // 6. Candidate Filtering (models supplied by caller)
-        let candidates = self.candidate_filtering.filter(available_models.to_vec(), &capabilities)?;
+        // 6. Capability Mapping
+        let capabilities = self.capability_mapper.map(&requirements)?;
 
-        // 7. Policy Evaluation
-        let approved = self.policy_evaluator.evaluate(candidates, &capabilities, policy)?;
+        // 7. Capability Prioritization
+        let capability_requirements = self.capability_prioritizer.prioritize(capabilities)?;
 
-        // 8. Candidate Scoring
-        let scored = self.candidate_scorer.score(approved, &capabilities)?;
+        let capability_profile = prism_core::types::CapabilityProfile {
+            requirements: capability_requirements,
+        };
 
-        // 9. Decision Selection
+        // 8. Candidate Filtering (models supplied by caller)
+        let candidates = self.candidate_filtering.filter(available_models.to_vec(), &capability_profile)?;
+
+        // 9. Policy Evaluation
+        let approved = self.policy_evaluator.evaluate(candidates, &capability_profile, policy)?;
+
+        // 10. Candidate Scoring
+        let scored = self.candidate_scorer.score(approved, &capability_profile)?;
+
+        // 11. Decision Selection
         let recommendation = self.decision_selector.select(scored)?;
 
-        // 10. Explanation Generation
-        let explanation = self.explanation_generator.generate(&recommendation, &capabilities)?;
+        // 12. Explanation Generation
+        let explanation = self.explanation_generator.generate(&recommendation, &capability_profile)?;
 
-        // 11. Decision Report
+        // 13. Decision Report
         Ok(DecisionReport {
             prompt: prompt.clone(),
-            capabilities,
+            capabilities: capability_profile,
             recommendation,
             explanation,
         })
@@ -77,7 +89,9 @@ impl Default for DecisionEngine {
             normalizer: Box::new(DefaultNormalizer),
             intrinsic_extractor: Box::new(DefaultIntrinsicExtractor),
             derived_analyzer: Box::new(DefaultDerivedAnalyzer),
-            capability_extractor: Box::new(DefaultCapabilityExtractor),
+            requirement_inferer: Box::new(DefaultRequirementInferer),
+            capability_mapper: Box::new(DefaultCapabilityMapper),
+            capability_prioritizer: Box::new(DefaultCapabilityPrioritizer),
             candidate_filtering: Box::new(DefaultCandidateFiltering),
             policy_evaluator: Box::new(DefaultPolicyEvaluator),
             candidate_scorer: Box::new(DefaultCandidateScorer),
@@ -96,15 +110,22 @@ mod tests {
         vec![
             ModelProfile {
                 id: "model-a".into(),
-                capabilities: vec!["coding".into(), "reasoning".into()],
+                capabilities: vec![
+                    "code generation".into(),
+                    "logical reasoning".into(),
+                ],
             },
             ModelProfile {
                 id: "model-b".into(),
-                capabilities: vec!["creative writing".into(), "general".into()],
+                capabilities: vec!["writing".into(), "general".into()],
             },
             ModelProfile {
                 id: "model-c".into(),
-                capabilities: vec!["coding".into(), "translation".into(), "reasoning".into()],
+                capabilities: vec![
+                    "code generation".into(),
+                    "translation".into(),
+                    "logical reasoning".into(),
+                ],
             },
         ]
     }
@@ -166,7 +187,9 @@ mod tests {
     #[test]
     fn engine_selects_highest_scored_model() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Write code for a sorting algorithm".into() };
+        // Use Python keyword so intrinsic extractor detects a language,
+        // setting modality to "code" and triggering coding task category.
+        let prompt = Prompt { text: "Implement a sorting algorithm in Python".into() };
         let models = sample_models();
         let policy = Policy::default();
 
@@ -191,11 +214,11 @@ mod tests {
     #[test]
     fn engine_uses_caller_supplied_models_only() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Write code".into() };
+        let prompt = Prompt { text: "Implement a sorting algorithm in Python".into() };
         let models = vec![
             ModelProfile {
                 id: "only-model".into(),
-                capabilities: vec!["coding".into()],
+                capabilities: vec!["code generation".into()],
             },
         ];
         let policy = Policy::default();

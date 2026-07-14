@@ -1,5 +1,4 @@
 pub mod analysis;
-pub mod capability;
 pub mod derived;
 pub mod explanation;
 pub mod filtering;
@@ -13,7 +12,6 @@ pub mod scoring;
 pub mod selection;
 
 pub use analysis::PromptProfile;
-pub use capability::CapabilityExtractor;
 pub use derived::DerivedAnalyzer;
 pub use explanation::ExplanationGenerator;
 pub use filtering::CandidateFiltering;
@@ -26,12 +24,14 @@ pub use requirement::RequirementInferer;
 pub use scoring::CandidateScorer;
 pub use selection::DecisionSelector;
 
-pub use capability::DefaultCapabilityExtractor;
 pub use derived::DefaultDerivedAnalyzer;
 pub use explanation::DefaultExplanationGenerator;
 pub use filtering::DefaultCandidateFiltering;
 pub use intrinsic::DefaultIntrinsicExtractor;
+pub use mapping::DefaultCapabilityMapper;
 pub use normalization::DefaultNormalizer;
 pub use policy::DefaultPolicyEvaluator;
+pub use prioritization::DefaultCapabilityPrioritizer;
+pub use requirement::DefaultRequirementInferer;
 pub use scoring::DefaultCandidateScorer;
 pub use selection::DefaultDecisionSelector;
