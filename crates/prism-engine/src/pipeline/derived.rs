@@ -86,3 +86,61 @@ impl DerivedAnalyzer for DefaultDerivedAnalyzer {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prism_core::types::Prompt;
+    use crate::pipeline::intrinsic::{DefaultIntrinsicExtractor, IntrinsicExtractor};
+
+    fn analyze(text: &str) -> DerivedProfile {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: text.into() };
+        let intrinsic = extractor.extract(&prompt).unwrap();
+        let analyzer = DefaultDerivedAnalyzer;
+        analyzer.analyze(&intrinsic).unwrap()
+    }
+
+    #[test]
+    fn derived_classifies_coding_task() {
+        let profile = analyze("Write a Python function");
+        assert_eq!(profile.task_category, "coding");
+    }
+
+    #[test]
+    fn derived_classifies_creative_writing() {
+        let profile = analyze("Write a story about a dragon");
+        assert_eq!(profile.task_category, "creative writing");
+    }
+
+    #[test]
+    fn derived_classifies_analysis() {
+        let profile = analyze("Analyze the pros and cons");
+        assert_eq!(profile.task_category, "analysis");
+    }
+
+    #[test]
+    fn derived_classifies_translation() {
+        let profile = analyze("Translate this document to French");
+        assert_eq!(profile.task_category, "translation");
+    }
+
+    #[test]
+    fn derived_complexity_increases_with_word_count() {
+        let short = analyze("Hello");
+        let long = analyze(&std::iter::repeat("word").take(100).collect::<Vec<_>>().join(" "));
+        assert_ne!(short.complexity, long.complexity);
+    }
+
+    #[test]
+    fn derived_reasoning_depth_deep_for_explain() {
+        let profile = analyze("Explain how quantum computing works");
+        assert_eq!(profile.reasoning_depth, "deep");
+    }
+
+    #[test]
+    fn derived_ambiguity_high_for_uncertain_requests() {
+        let profile = analyze("Maybe write something creative");
+        assert_eq!(profile.ambiguity, "high");
+    }
+}

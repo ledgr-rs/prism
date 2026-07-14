@@ -99,3 +99,57 @@ impl IntrinsicExtractor for DefaultIntrinsicExtractor {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prism_core::types::Prompt;
+
+    #[test]
+    fn intrinsic_extracts_word_count() {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: "hello world from rust".into() };
+        let profile = extractor.extract(&prompt).unwrap();
+        assert_eq!(profile.word_count, 4);
+    }
+
+    #[test]
+    fn intrinsic_detects_programming_language() {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: "Write a Python function using numpy".into() };
+        let profile = extractor.extract(&prompt).unwrap();
+        assert!(profile.languages.contains(&"python".to_string()));
+    }
+
+    #[test]
+    fn intrinsic_detects_output_format() {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: "Return the result as JSON".into() };
+        let profile = extractor.extract(&prompt).unwrap();
+        assert_eq!(profile.output_format, Some("json".to_string()));
+    }
+
+    #[test]
+    fn intrinsic_sets_modality_to_text_for_plain_prompts() {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: "Tell me a story".into() };
+        let profile = extractor.extract(&prompt).unwrap();
+        assert_eq!(profile.modality, "text");
+    }
+
+    #[test]
+    fn intrinsic_sets_modality_to_code_when_language_detected() {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: "Write a Rust function".into() };
+        let profile = extractor.extract(&prompt).unwrap();
+        assert_eq!(profile.modality, "code");
+    }
+
+    #[test]
+    fn intrinsic_extracts_keywords() {
+        let extractor = DefaultIntrinsicExtractor;
+        let prompt = Prompt { text: "implement a sorting algorithm efficiently".into() };
+        let profile = extractor.extract(&prompt).unwrap();
+        assert!(profile.keywords.contains(&"sorting".to_string()));
+    }
+}
