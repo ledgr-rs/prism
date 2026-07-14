@@ -1,5 +1,7 @@
 [workspace]
 members = [
-    "crates/*",
+    "crates/prism-core",
+    "crates/prism-engine",
+    "crates/prism-registry",
 ]
 resolver = "2"
