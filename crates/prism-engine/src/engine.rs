@@ -59,19 +59,28 @@ impl DecisionEngine {
         };
 
         // 8. Candidate Filtering (models supplied by caller)
-        let candidates = self.candidate_filtering.filter(available_models.to_vec(), &capability_profile)?;
+        let candidates = self
+            .candidate_filtering
+            .filter(available_models.to_vec(), &capability_profile)?;
 
         // 9. Policy Evaluation
-        let approved = self.policy_evaluator.evaluate(candidates, &capability_profile, policy)?;
+        let approved = self
+            .policy_evaluator
+            .evaluate(candidates, &capability_profile, policy)?;
 
         // 10. Candidate Scoring
         let scored = self.candidate_scorer.score(approved, &capability_profile)?;
 
         // 11. Decision Selection
-        let recommendation = self.decision_selector.select(scored)?;
+        let recommendation = self.decision_selector.select(scored.clone())?;
 
         // 12. Explanation Generation
-        let explanation = self.explanation_generator.generate(&recommendation, &capability_profile)?;
+        let explanation = self.explanation_generator.generate(
+            &recommendation,
+            &scored,
+            &capability_profile,
+            policy,
+        )?;
 
         // 13. Decision Report
         Ok(DecisionReport {
@@ -104,50 +113,72 @@ impl Default for DecisionEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prism_core::types::Policy;
+    use prism_core::types::{
+        Capability, CapabilitySupport, ModelIdentity, Policy, PolicyRule, SupportLevel,
+    };
+
+    fn capability_support(id: &str, caps: &[&str]) -> ModelProfile {
+        let cap_list: Vec<CapabilitySupport> = caps
+            .iter()
+            .filter_map(|name| {
+                // Map string names to Capability enum variants for test scenarios.
+                let cap = match *name {
+                    "code generation" => Capability::CodeGeneration,
+                    "logical reasoning" => Capability::LogicalReasoning,
+                    "writing" => Capability::Writing,
+                    "general" => Capability::GeneralKnowledge,
+                    "translation" => Capability::Translation,
+                    _ => return None,
+                };
+                Some(CapabilitySupport {
+                    capability: cap,
+                    support_level: SupportLevel::Full,
+                    confidence: 1.0,
+                })
+            })
+            .collect();
+        ModelProfile {
+            identity: ModelIdentity {
+                id: id.into(),
+                name: id.into(),
+                provider: "test".into(),
+                ..Default::default()
+            },
+            capabilities: cap_list,
+            ..Default::default()
+        }
+    }
 
     fn sample_models() -> Vec<ModelProfile> {
         vec![
-            ModelProfile {
-                id: "model-a".into(),
-                capabilities: vec![
-                    "code generation".into(),
-                    "logical reasoning".into(),
-                ],
-            },
-            ModelProfile {
-                id: "model-b".into(),
-                capabilities: vec!["writing".into(), "general".into()],
-            },
-            ModelProfile {
-                id: "model-c".into(),
-                capabilities: vec![
-                    "code generation".into(),
-                    "translation".into(),
-                    "logical reasoning".into(),
-                ],
-            },
+            capability_support("model-a", &["code generation", "logical reasoning"]),
+            capability_support("model-b", &["writing", "general"]),
+            capability_support("model-c", &["code generation", "translation", "logical reasoning"]),
         ]
     }
 
     #[test]
     fn engine_produces_decision_report() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Write a story about a robot".into() };
+        let prompt = Prompt {
+            text: "Write a story about a robot".into(),
+        };
         let models = sample_models();
         let policy = Policy::default();
 
         let report = engine.evaluate(&prompt, &models, &policy).unwrap();
 
-        assert!(!report.recommendation.model.id.is_empty());
+        assert!(!report.recommendation.model.identity.id.is_empty());
         assert!(report.recommendation.score >= 0.0);
-        assert!(!report.explanation.reasoning.is_empty());
+        assert!(!report.explanation.summary.is_empty());
     }
 
     #[test]
     fn engine_rejects_empty_models() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Hello".into() };
+        let prompt = Prompt {
+            text: "Hello".into(),
+        };
         let models = vec![];
         let policy = Policy::default();
 
@@ -159,11 +190,13 @@ mod tests {
     #[test]
     fn engine_rejects_unsatisfiable_policy() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Hello".into() };
+        let prompt = Prompt {
+            text: "Hello".into(),
+        };
         let models = sample_models();
         let policy = Policy {
             name: "impossible".into(),
-            constraints: vec!["nonexistent-capability".into()],
+            rules: vec![PolicyRule::PreferredProviders(vec!["nonexistent".into()])],
         };
 
         let result = engine.evaluate(&prompt, &models, &policy);
@@ -187,44 +220,46 @@ mod tests {
     #[test]
     fn engine_selects_highest_scored_model() {
         let engine = DecisionEngine::default();
-        // Use Python keyword so intrinsic extractor detects a language,
-        // setting modality to "code" and triggering coding task category.
-        let prompt = Prompt { text: "Implement a sorting algorithm in Python".into() };
+        let prompt = Prompt {
+            text: "Implement a sorting algorithm in Python".into(),
+        };
         let models = sample_models();
         let policy = Policy::default();
 
         let report = engine.evaluate(&prompt, &models, &policy).unwrap();
 
-        assert_eq!(report.recommendation.model.id, "model-c");
+        assert_eq!(report.recommendation.model.identity.id, "model-c");
         assert!(report.recommendation.score > 0.0);
     }
 
     #[test]
     fn engine_explanation_mentions_selected_model() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Translate this document".into() };
+        let prompt = Prompt {
+            text: "Translate this document".into(),
+        };
         let models = sample_models();
         let policy = Policy::default();
 
         let report = engine.evaluate(&prompt, &models, &policy).unwrap();
 
-        assert!(report.explanation.reasoning.contains(&report.recommendation.model.id));
+        assert!(report
+            .explanation
+            .summary
+            .contains(&report.recommendation.model.identity.id));
     }
 
     #[test]
     fn engine_uses_caller_supplied_models_only() {
         let engine = DecisionEngine::default();
-        let prompt = Prompt { text: "Implement a sorting algorithm in Python".into() };
-        let models = vec![
-            ModelProfile {
-                id: "only-model".into(),
-                capabilities: vec!["code generation".into()],
-            },
-        ];
+        let prompt = Prompt {
+            text: "Implement a sorting algorithm in Python".into(),
+        };
+        let models = vec![capability_support("only-model", &["code generation"])];
         let policy = Policy::default();
 
         let report = engine.evaluate(&prompt, &models, &policy).unwrap();
 
-        assert_eq!(report.recommendation.model.id, "only-model");
+        assert_eq!(report.recommendation.model.identity.id, "only-model");
     }
 }
