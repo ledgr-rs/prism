@@ -73,3 +73,71 @@ impl Default for DecisionEngine {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prism_core::types::Policy;
+
+    #[test]
+    fn engine_produces_decision_report() {
+        let engine = DecisionEngine::default();
+        let prompt = Prompt { text: "Write a story about a robot".into() };
+        let policy = Policy::default();
+
+        let report = engine.evaluate(prompt, policy).unwrap();
+
+        assert!(!report.recommendation.model.id.is_empty());
+        assert!(report.recommendation.score >= 0.0);
+        assert!(!report.explanation.reasoning.is_empty());
+    }
+
+    #[test]
+    fn engine_rejects_unsatisfiable_policy() {
+        let engine = DecisionEngine::default();
+        let prompt = Prompt { text: "Hello".into() };
+        let policy = Policy {
+            name: "impossible".into(),
+            constraints: vec!["nonexistent-capability".into()],
+        };
+
+        let result = engine.evaluate(prompt, policy);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn engine_preserves_prompt_text() {
+        let engine = DecisionEngine::default();
+        let text = "Explain quantum computing in simple terms".to_string();
+        let prompt = Prompt { text: text.clone() };
+        let policy = Policy::default();
+
+        let report = engine.evaluate(prompt, policy).unwrap();
+
+        assert_eq!(report.prompt.text, text);
+    }
+
+    #[test]
+    fn engine_default_constructs() {
+        let engine = DecisionEngine::default();
+        let prompt = Prompt { text: "test".into() };
+        let policy = Policy::default();
+
+        let report = engine.evaluate(prompt, policy).unwrap();
+
+        assert_eq!(report.capabilities.requirements.len(), 1);
+        assert_eq!(report.capabilities.requirements[0], "general");
+    }
+
+    #[test]
+    fn engine_scores_highest_for_best_match() {
+        let engine = DecisionEngine::default();
+        let prompt = Prompt { text: "Write code for a sorting algorithm".into() };
+        let policy = Policy::default();
+
+        let report = engine.evaluate(prompt, policy).unwrap();
+
+        assert!(report.recommendation.score > 0.0);
+    }
+}
