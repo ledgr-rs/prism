@@ -7,6 +7,7 @@ use crate::pipeline::analysis::PromptProfile;
 /// These are implementation-neutral descriptions of what the task
 /// requires, before mapping to Prism's canonical capability taxonomy.
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Default)]
 pub struct TaskRequirements {
     /// Whether the task requires code generation or modification.
     pub needs_code_generation: bool,
@@ -103,5 +104,62 @@ impl RequirementInferer for DefaultRequirementInferer {
             needs_tool_use,
             output_formats,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pipeline::intrinsic::{DefaultIntrinsicExtractor, IntrinsicExtractor};
+    use crate::pipeline::derived::{DefaultDerivedAnalyzer, DerivedAnalyzer};
+    use prism_core::types::Prompt;
+
+    fn analyze(text: &str) -> PromptProfile {
+        let extractor = DefaultIntrinsicExtractor;
+        let analyzer = DefaultDerivedAnalyzer;
+        let prompt = Prompt { text: text.into() };
+        let intrinsic = extractor.extract(&prompt).unwrap();
+        let derived = analyzer.analyze(&intrinsic).unwrap();
+        PromptProfile { intrinsic, derived }
+    }
+
+    #[test]
+    fn requirement_infers_coding_from_python_prompt() {
+        let profile = analyze("Write a Python function");
+        let inferer = DefaultRequirementInferer;
+        let reqs = inferer.infer(&profile).unwrap();
+        assert!(reqs.needs_code_generation);
+    }
+
+    #[test]
+    fn requirement_infers_reasoning_from_explain_prompt() {
+        let profile = analyze("Explain quantum entanglement");
+        let inferer = DefaultRequirementInferer;
+        let reqs = inferer.infer(&profile).unwrap();
+        assert!(reqs.needs_reasoning);
+    }
+
+    #[test]
+    fn requirement_infers_translation() {
+        let profile = analyze("Translate this to French");
+        let inferer = DefaultRequirementInferer;
+        let reqs = inferer.infer(&profile).unwrap();
+        assert!(reqs.needs_translation);
+    }
+
+    #[test]
+    fn requirement_infers_structured_output() {
+        let profile = analyze("Return the result as JSON");
+        let inferer = DefaultRequirementInferer;
+        let reqs = inferer.infer(&profile).unwrap();
+        assert!(reqs.needs_structured_output);
+    }
+
+    #[test]
+    fn requirement_infers_planning_for_complex_tasks() {
+        let profile = analyze("Plan a multi-step deployment strategy");
+        let inferer = DefaultRequirementInferer;
+        let reqs = inferer.infer(&profile).unwrap();
+        assert!(reqs.needs_planning);
     }
 }

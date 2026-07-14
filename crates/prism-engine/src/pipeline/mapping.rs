@@ -68,3 +68,73 @@ impl CapabilityMapper for DefaultCapabilityMapper {
         Ok(capabilities)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prism_core::types::Capability;
+
+    fn requirements(
+        code: bool,
+        reasoning: bool,
+        structured: bool,
+        writing: bool,
+    ) -> TaskRequirements {
+        TaskRequirements {
+            needs_code_generation: code,
+            needs_reasoning: reasoning,
+            needs_structured_output: structured,
+            needs_writing: writing,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn mapper_maps_code_generation() {
+        let reqs = requirements(true, false, false, false);
+        let mapper = DefaultCapabilityMapper;
+        let caps = mapper.map(&reqs).unwrap();
+        assert!(caps.contains(&Capability::CodeGeneration));
+    }
+
+    #[test]
+    fn mapper_maps_multiple_capabilities() {
+        let reqs = requirements(true, true, true, false);
+        let mapper = DefaultCapabilityMapper;
+        let caps = mapper.map(&reqs).unwrap();
+        assert!(caps.contains(&Capability::CodeGeneration));
+        assert!(caps.contains(&Capability::LogicalReasoning));
+        assert!(caps.contains(&Capability::StructuredOutput));
+    }
+
+    #[test]
+    fn mapper_returns_general_when_no_requirements() {
+        let reqs = requirements(false, false, false, false);
+        let mapper = DefaultCapabilityMapper;
+        let caps = mapper.map(&reqs).unwrap();
+        assert_eq!(caps, vec![Capability::General]);
+    }
+
+    #[test]
+    fn mapper_maps_translation() {
+        let reqs = TaskRequirements {
+            needs_translation: true,
+            ..Default::default()
+        };
+        let mapper = DefaultCapabilityMapper;
+        let caps = mapper.map(&reqs).unwrap();
+        assert!(caps.contains(&Capability::Translation));
+    }
+
+    #[test]
+    fn mapper_maps_output_formats() {
+        let reqs = TaskRequirements {
+            output_formats: vec!["json".into(), "xml".into()],
+            ..Default::default()
+        };
+        let mapper = DefaultCapabilityMapper;
+        let caps = mapper.map(&reqs).unwrap();
+        assert!(caps.contains(&Capability::Json));
+        assert!(caps.contains(&Capability::Xml));
+    }
+}

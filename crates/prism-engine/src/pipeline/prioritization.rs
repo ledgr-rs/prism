@@ -141,3 +141,57 @@ impl CapabilityPrioritizer for DefaultCapabilityPrioritizer {
         Ok(requirements)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prism_core::types::Capability;
+
+    #[test]
+    fn prioritizer_assigns_required_to_code_generation() {
+        let prioritizer = DefaultCapabilityPrioritizer;
+        let reqs = prioritizer.prioritize(vec![Capability::CodeGeneration]).unwrap();
+        assert_eq!(reqs.len(), 1);
+        assert_eq!(reqs[0].priority, Priority::Required);
+        assert!(reqs[0].weight > 0.9);
+    }
+
+    #[test]
+    fn prioritizer_assigns_optional_to_general() {
+        let prioritizer = DefaultCapabilityPrioritizer;
+        let reqs = prioritizer.prioritize(vec![Capability::General]).unwrap();
+        assert_eq!(reqs.len(), 1);
+        assert_eq!(reqs[0].priority, Priority::Optional);
+        assert_eq!(reqs[0].weight, 0.20);
+    }
+
+    #[test]
+    fn prioritizer_includes_reason_string() {
+        let prioritizer = DefaultCapabilityPrioritizer;
+        let reqs = prioritizer.prioritize(vec![Capability::Writing]).unwrap();
+        assert!(reqs[0].reason.contains("writing"));
+        assert!(reqs[0].reason.contains("inferred from prompt analysis"));
+    }
+
+    #[test]
+    fn prioritizer_handles_multiple_capabilities() {
+        let prioritizer = DefaultCapabilityPrioritizer;
+        let caps = vec![
+            Capability::CodeGeneration,
+            Capability::Translation,
+            Capability::General,
+        ];
+        let reqs = prioritizer.prioritize(caps).unwrap();
+        assert_eq!(reqs.len(), 3);
+        assert!(reqs.iter().any(|r| r.capability == Capability::CodeGeneration));
+        assert!(reqs.iter().any(|r| r.capability == Capability::Translation));
+        assert!(reqs.iter().any(|r| r.capability == Capability::General));
+    }
+
+    #[test]
+    fn prioritizer_empty_input_yields_empty_output() {
+        let prioritizer = DefaultCapabilityPrioritizer;
+        let reqs = prioritizer.prioritize(vec![]).unwrap();
+        assert!(reqs.is_empty());
+    }
+}
