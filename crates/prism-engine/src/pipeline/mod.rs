@@ -4,8 +4,11 @@ pub mod derived;
 pub mod explanation;
 pub mod filtering;
 pub mod intrinsic;
+pub mod mapping;
 pub mod normalization;
 pub mod policy;
+pub mod prioritization;
+pub mod requirement;
 pub mod scoring;
 pub mod selection;
 
@@ -15,8 +18,11 @@ pub use derived::DerivedAnalyzer;
 pub use explanation::ExplanationGenerator;
 pub use filtering::CandidateFiltering;
 pub use intrinsic::IntrinsicExtractor;
+pub use mapping::CapabilityMapper;
 pub use normalization::Normalizer;
 pub use policy::PolicyEvaluator;
+pub use prioritization::CapabilityPrioritizer;
+pub use requirement::RequirementInferer;
 pub use scoring::CandidateScorer;
 pub use selection::DecisionSelector;
 
