@@ -1,27 +1,7 @@
 use prism_core::error::PrismError;
 use prism_core::types::Prompt;
 
-/// Observable facts extracted directly from a prompt.
-///
-/// These are deterministic properties that can be identified without
-/// inference or external knowledge.
-#[derive(Debug, Clone, PartialEq)]
-pub struct IntrinsicProfile {
-    /// The original raw text.
-    pub text: String,
-    /// Approximate word count.
-    pub word_count: usize,
-    /// Programming languages detected in the prompt.
-    pub languages: Vec<String>,
-    /// Frameworks or libraries mentioned.
-    pub frameworks: Vec<String>,
-    /// Expected output format, if detectable.
-    pub output_format: Option<String>,
-    /// Notable keywords found in the prompt.
-    pub keywords: Vec<String>,
-    /// The communication modality (e.g. "text", "code", "multimodal").
-    pub modality: String,
-}
+pub use prism_core::types::IntrinsicProfile;
 
 /// Responsible for extracting observable properties from a normalized prompt.
 pub trait IntrinsicExtractor {
@@ -75,7 +55,10 @@ impl IntrinsicExtractor for DefaultIntrinsicExtractor {
         let mut keywords: Vec<String> = text
             .split_whitespace()
             .filter(|w| w.len() > 5)
-            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
+            .map(|w| {
+                w.trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_lowercase()
+            })
             .filter(|w| !w.is_empty())
             .collect();
         keywords.sort();
@@ -108,7 +91,9 @@ mod tests {
     #[test]
     fn intrinsic_extracts_word_count() {
         let extractor = DefaultIntrinsicExtractor;
-        let prompt = Prompt { text: "hello world from rust".into() };
+        let prompt = Prompt {
+            text: "hello world from rust".into(),
+        };
         let profile = extractor.extract(&prompt).unwrap();
         assert_eq!(profile.word_count, 4);
     }
@@ -116,7 +101,9 @@ mod tests {
     #[test]
     fn intrinsic_detects_programming_language() {
         let extractor = DefaultIntrinsicExtractor;
-        let prompt = Prompt { text: "Write a Python function using numpy".into() };
+        let prompt = Prompt {
+            text: "Write a Python function using numpy".into(),
+        };
         let profile = extractor.extract(&prompt).unwrap();
         assert!(profile.languages.contains(&"python".to_string()));
     }
@@ -124,7 +111,9 @@ mod tests {
     #[test]
     fn intrinsic_detects_output_format() {
         let extractor = DefaultIntrinsicExtractor;
-        let prompt = Prompt { text: "Return the result as JSON".into() };
+        let prompt = Prompt {
+            text: "Return the result as JSON".into(),
+        };
         let profile = extractor.extract(&prompt).unwrap();
         assert_eq!(profile.output_format, Some("json".to_string()));
     }
@@ -132,7 +121,9 @@ mod tests {
     #[test]
     fn intrinsic_sets_modality_to_text_for_plain_prompts() {
         let extractor = DefaultIntrinsicExtractor;
-        let prompt = Prompt { text: "Tell me a story".into() };
+        let prompt = Prompt {
+            text: "Tell me a story".into(),
+        };
         let profile = extractor.extract(&prompt).unwrap();
         assert_eq!(profile.modality, "text");
     }
@@ -140,7 +131,9 @@ mod tests {
     #[test]
     fn intrinsic_sets_modality_to_code_when_language_detected() {
         let extractor = DefaultIntrinsicExtractor;
-        let prompt = Prompt { text: "Write a Rust function".into() };
+        let prompt = Prompt {
+            text: "Write a Rust function".into(),
+        };
         let profile = extractor.extract(&prompt).unwrap();
         assert_eq!(profile.modality, "code");
     }
@@ -148,7 +141,9 @@ mod tests {
     #[test]
     fn intrinsic_extracts_keywords() {
         let extractor = DefaultIntrinsicExtractor;
-        let prompt = Prompt { text: "implement a sorting algorithm efficiently".into() };
+        let prompt = Prompt {
+            text: "implement a sorting algorithm efficiently".into(),
+        };
         let profile = extractor.extract(&prompt).unwrap();
         assert!(profile.keywords.contains(&"sorting".to_string()));
     }
