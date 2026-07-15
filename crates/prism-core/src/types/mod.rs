@@ -19,7 +19,7 @@ pub mod policy;
 pub use policy::{Policy, PolicyRule};
 
 pub mod prompt;
-pub use prompt::Prompt;
+pub use prompt::{DerivedProfile, IntrinsicProfile, Prompt, PromptProfile};
 
 pub mod recommendation;
 pub use recommendation::Recommendation;
