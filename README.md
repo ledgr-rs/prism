@@ -4,10 +4,6 @@
 
 Prism separates routing from execution, allowing applications to choose the right model through explicit capabilities, policies, and transparent decisions.
 
-<p align="center">
-  <img src="docs/assets/architecture1.png" alt="Prism Architecture" width="900">
-</p>
-
 ---
 
 ## Why Prism?
@@ -30,11 +26,7 @@ Routing is a system of its own. Prism treats it that way.
 
 ## How It Works
 
-Instead of asking:
-
-> Which provider should I call?
-
-Applications describe **what they need**.
+Instead of asking *which provider should I call?*, applications describe **what they need**.
 
 Prism then:
 
@@ -44,9 +36,29 @@ Prism then:
 4. selects the best execution target
 5. explains the decision
 
-Execution is optional.
+Execution is optional. Prism can recommend a model or execute the request through provider adapters.
 
-Prism can either recommend a model or execute the request through provider adapters.
+---
+
+## Crates
+
+| Crate | Description |
+|-------|-------------|
+| `prism-core` | Domain types, traits, and contracts shared across all crates |
+| `prism-engine` | 13-stage deterministic routing pipeline |
+| `prism-registry` | Model profile storage and retrieval |
+| `prism-tui` | Terminal interface for interactive decision exploration |
+
+### prism-tui
+
+Launch with `cargo run` to enter an interactive prompt evaluator.
+
+Type or paste a request, press Enter, and explore the full routing pipeline:
+
+- pipeline sidebar with stage-by-stage navigation
+- structured workspace views per stage
+- contextual details panel
+- search, replay, and JSON export
 
 ---
 
@@ -70,14 +82,53 @@ Applications depend on capabilities rather than vendor-specific APIs.
 
 ---
 
+## Pipeline
+
+```
+Prompt
+  ↓
+Normalization
+  ↓
+Intrinsic Extraction  →  Derived Analysis
+  ↓
+Requirement Inference  →  Capability Mapping  →  Prioritization
+  ↓
+Candidate Filtering
+  ↓
+Policy Evaluation
+  ↓
+Candidate Scoring
+  ↓
+Decision Selection
+  ↓
+Explanation Generation
+  ↓
+Decision Report
+```
+
+---
+
 ## Roadmap
 
-- Core routing engine
-- Capability registry
-- Policy framework
-- Provider adapters
-- SDKs
-- Benchmark suite
+- [x] Core routing engine
+- [x] Capability taxonomy and extraction
+- [x] Policy framework with typed rules
+- [x] Candidate scoring with evidence
+- [x] Interactive terminal UI
+- [ ] Provider adapters
+- [ ] HTTP API
+- [ ] Configuration DSL
+- [ ] Plugin system
+
+---
+
+## Getting Started
+
+```sh
+cargo build
+cargo test
+cargo run -p prism-tui
+```
 
 ---
 
