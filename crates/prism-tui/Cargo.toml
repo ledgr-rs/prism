@@ -1,0 +1,15 @@
+[package]
+name = "prism-tui"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "prism"
+path = "src/main.rs"
+
+[dependencies]
+crossterm = "0.28"
+ratatui = "0.29"
+prism-core = { path = "../prism-core" }
+prism-engine = { path = "../prism-engine" }
+prism-registry = { path = "../prism-registry" }
