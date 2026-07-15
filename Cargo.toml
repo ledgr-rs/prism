@@ -3,5 +3,6 @@ members = [
     "crates/prism-core",
     "crates/prism-engine",
     "crates/prism-registry",
+    "crates/prism-tui",
 ]
 resolver = "2"
