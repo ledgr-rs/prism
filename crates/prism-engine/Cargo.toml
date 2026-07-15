@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 prism-core = { path = "../prism-core" }
+prism-registry = { path = "../prism-registry" }
