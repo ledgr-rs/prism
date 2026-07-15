@@ -1,22 +1,7 @@
 use prism_core::error::PrismError;
+pub use prism_core::types::DerivedProfile;
 
 use crate::pipeline::intrinsic::IntrinsicProfile;
-
-/// Inferred properties derived from a prompt's intrinsic observations.
-///
-/// These represent conclusions drawn from the IntrinsicProfile rather than
-/// directly observable facts.
-#[derive(Debug, Clone, PartialEq)]
-pub struct DerivedProfile {
-    /// The inferred category of the task.
-    pub task_category: String,
-    /// Estimated complexity level.
-    pub complexity: String,
-    /// Required depth of reasoning.
-    pub reasoning_depth: String,
-    /// Estimated ambiguity of the request.
-    pub ambiguity: String,
-}
 
 /// Responsible for analyzing intrinsic observations to produce a DerivedProfile.
 pub trait DerivedAnalyzer {
@@ -35,7 +20,8 @@ impl DerivedAnalyzer for DefaultDerivedAnalyzer {
             "coding".to_string()
         } else if lower.contains("write") || lower.contains("story") || lower.contains("creative") {
             "creative writing".to_string()
-        } else if lower.contains("analy") || lower.contains("compare") || lower.contains("evaluate") {
+        } else if lower.contains("analy") || lower.contains("compare") || lower.contains("evaluate")
+        {
             "analysis".to_string()
         } else if lower.contains("translate") || lower.contains("language") {
             "translation".to_string()
@@ -90,8 +76,8 @@ impl DerivedAnalyzer for DefaultDerivedAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use prism_core::types::Prompt;
     use crate::pipeline::intrinsic::{DefaultIntrinsicExtractor, IntrinsicExtractor};
+    use prism_core::types::Prompt;
 
     fn analyze(text: &str) -> DerivedProfile {
         let extractor = DefaultIntrinsicExtractor;
@@ -128,7 +114,12 @@ mod tests {
     #[test]
     fn derived_complexity_increases_with_word_count() {
         let short = analyze("Hello");
-        let long = analyze(&std::iter::repeat("word").take(100).collect::<Vec<_>>().join(" "));
+        let long = analyze(
+            &std::iter::repeat("word")
+                .take(100)
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
         assert_ne!(short.complexity, long.complexity);
     }
 
