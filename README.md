@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/favicon.png" alt="Prism" width="72">
+</p>
+
 # Prism
 
 > An explainable decision engine for model routing.
