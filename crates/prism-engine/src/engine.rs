@@ -64,12 +64,19 @@ impl DecisionEngine {
             .filter(available_models.to_vec(), &capability_profile)?;
 
         // 9. Policy Evaluation
-        let approved = self
-            .policy_evaluator
-            .evaluate(candidates, &capability_profile, policy)?;
+        let approved =
+            self.policy_evaluator
+                .evaluate(candidates.clone(), &capability_profile, policy)?;
 
         // 10. Candidate Scoring
-        let scored = self.candidate_scorer.score(approved, &capability_profile)?;
+        let mut scored = self
+            .candidate_scorer
+            .score(approved.clone(), &capability_profile)?;
+        scored.sort_by(|a, b| {
+            b.1.final_score
+                .partial_cmp(&a.1.final_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // 11. Decision Selection
         let recommendation = self.decision_selector.select(scored.clone())?;
@@ -85,7 +92,13 @@ impl DecisionEngine {
         // 13. Decision Report
         Ok(DecisionReport {
             prompt: prompt.clone(),
+            prompt_profile: profile,
             capabilities: capability_profile,
+            model_registry: available_models.to_vec(),
+            candidates,
+            policy_approved_candidates: approved,
+            policy: policy.clone(),
+            scored_candidates: scored,
             recommendation,
             explanation,
         })
@@ -153,7 +166,10 @@ mod tests {
         vec![
             capability_support("model-a", &["code generation", "logical reasoning"]),
             capability_support("model-b", &["writing", "general"]),
-            capability_support("model-c", &["code generation", "translation", "logical reasoning"]),
+            capability_support(
+                "model-c",
+                &["code generation", "translation", "logical reasoning"],
+            ),
         ]
     }
 
@@ -243,10 +259,12 @@ mod tests {
 
         let report = engine.evaluate(&prompt, &models, &policy).unwrap();
 
-        assert!(report
-            .explanation
-            .summary
-            .contains(&report.recommendation.model.identity.id));
+        assert!(
+            report
+                .explanation
+                .summary
+                .contains(&report.recommendation.model.identity.id)
+        );
     }
 
     #[test]
