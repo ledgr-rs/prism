@@ -38,10 +38,7 @@ fn draw_prompt_entry(frame: &mut Frame<'_>, area: Rect, app: &App) {
             Style::default().fg(Color::Black).bg(theme::PURPLE),
         ),
         Span::styled("  Explainable model routing", theme::title()),
-        Span::styled(
-            "  Enter prompt -> DecisionEngine -> DecisionReport",
-            Style::default().fg(theme::MUTED).bg(theme::BG),
-        ),
+        
     ]))
     .block(
         Block::default()
