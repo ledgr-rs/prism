@@ -4,17 +4,21 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph, Wrap};
 
-use crate::app::{App, Panel, Stage, capability_counts};
+use crate::app::{App, Panel, Stage, View, capability_counts};
 use crate::theme;
 
 pub fn draw(frame: &mut Frame<'_>, app: &App) {
     let area = frame.area();
     frame.render_widget(Clear, area);
 
-    if app.report.is_none() {
-        draw_prompt_entry(frame, area, app);
-    } else {
-        draw_explorer(frame, area, app);
+    match app.view {
+        View::Prompt => draw_prompt_entry(frame, area, app),
+        View::Recommendation => draw_recommendation(frame, area, app),
+        View::Details => draw_explorer(frame, area, app),
+    }
+
+    if app.command_open {
+        draw_command_palette(frame, area, app);
     }
 
     if app.help_open {
@@ -38,7 +42,6 @@ fn draw_prompt_entry(frame: &mut Frame<'_>, area: Rect, app: &App) {
             Style::default().fg(Color::Black).bg(theme::PURPLE),
         ),
         Span::styled("  Explainable model routing", theme::title()),
-        
     ]))
     .block(
         Block::default()
@@ -48,17 +51,11 @@ fn draw_prompt_entry(frame: &mut Frame<'_>, area: Rect, app: &App) {
     .style(theme::base());
     frame.render_widget(header, shell[0]);
 
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
-        .split(shell[1]);
-    draw_sidebar(frame, columns[0], app);
-
     let input_area = Rect::new(
-        columns[1].x + 2,
-        columns[1].y + 1,
-        columns[1].width.saturating_sub(4),
-        5,
+        shell[1].x + 4,
+        shell[1].y + 2,
+        shell[1].width.saturating_sub(8),
+        shell[1].height.saturating_sub(4).clamp(5, 10),
     );
     let mut lines = vec![Line::from(vec![Span::styled(
         if app.prompt.is_empty() {
@@ -111,6 +108,73 @@ fn draw_prompt_entry(frame: &mut Frame<'_>, area: Rect, app: &App) {
     frame.render_widget(status, shell[2]);
 }
 
+fn draw_recommendation(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    let shell = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(10),
+            Constraint::Length(1),
+        ])
+        .split(area);
+
+    draw_header(frame, shell[0], app);
+
+    let Some(report) = &app.report else {
+        return;
+    };
+
+    let recommendation_area = Rect::new(
+        shell[1].x + 4,
+        shell[1].y + 1,
+        shell[1].width.saturating_sub(8),
+        shell[1].height.saturating_sub(2),
+    );
+    let confidence = (report.explanation.confidence.clamp(0.0, 1.0) * 100.0).round();
+    let lines = vec![
+        heading("Recommended Model"),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            report.recommendation.model.identity.name.clone(),
+            Style::default()
+                .fg(theme::TEXT)
+                .bg(theme::PANEL)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        kv("id", report.recommendation.model.identity.id.clone()),
+        kv(
+            "provider",
+            report.recommendation.model.identity.provider.clone(),
+        ),
+        Line::from(""),
+        heading("Confidence"),
+        Line::from(""),
+        text(format!("{confidence:.0}%")),
+        kv("score", format!("{:.3}", report.recommendation.score)),
+        Line::from(""),
+        heading("Summary"),
+        Line::from(""),
+        text(report.explanation.summary.clone()),
+        Line::from(""),
+        Line::from("----------------------------------------"),
+        Line::from(""),
+        text("Press /details to inspect the decision.".into()),
+    ];
+
+    let paragraph = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .title(" Recommendation ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme::ORANGE).bg(theme::PANEL))
+                .style(theme::panel()),
+        )
+        .style(theme::panel())
+        .wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, recommendation_area);
+    draw_status(frame, shell[2], app);
+}
+
 fn draw_explorer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let shell = Layout::default()
         .direction(Direction::Vertical)
@@ -136,10 +200,6 @@ fn draw_explorer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     draw_workspace(frame, columns[1], app);
     draw_details(frame, columns[2], app);
     draw_status(frame, shell[2], app);
-
-    if app.search_open {
-        draw_search(frame, area, app);
-    }
 }
 
 fn draw_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -371,33 +431,81 @@ fn draw_status(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .map(|duration| format!("{:.1}ms", duration.as_secs_f64() * 1000.0))
         .unwrap_or_else(|| "-".into());
     let replay = if app.replay.active { " | Replay" } else { "" };
+    let workspace = if app.view == View::Details {
+        app.current_stage().label()
+    } else {
+        "Recommendation"
+    };
     let text = format!(
-        "Prompt: {prompt_len} chars | Models: {} | Candidates: {candidate_count} | Eval: {eval_ms} | Workspace: {} | Engine: Deterministic{replay} | {}",
+        "Prompt: {prompt_len} chars | Models: {} | Candidates: {candidate_count} | Eval: {eval_ms} | View: {workspace} | Engine: Deterministic{replay} | {}",
         app.report
             .as_ref()
             .map(|report| report.model_registry.len())
             .unwrap_or(0),
-        app.current_stage().label(),
         app.status
     );
     let paragraph = Paragraph::new(text).style(Style::default().fg(Color::Black).bg(theme::ORANGE));
     frame.render_widget(paragraph, area);
 }
 
-fn draw_search(frame: &mut Frame<'_>, area: Rect, app: &App) {
+fn draw_command_palette(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let width = area.width.saturating_sub(8).min(72);
-    let search_area = Rect::new(area.x + 4, area.y + area.height.saturating_sub(4), width, 3);
-    let paragraph = Paragraph::new(format!("/{}", app.search_query))
+    let palette_height = 12.min(area.height.saturating_sub(2));
+    let palette_area = Rect::new(
+        area.x + 4,
+        area.y + area.height.saturating_sub(palette_height + 1),
+        width,
+        palette_height,
+    );
+
+    let query = app.command_query.trim().to_lowercase();
+    let commands = [
+        ("details", "open complete decision explorer"),
+        ("models", "inspect model registry"),
+        ("capabilities", "inspect extracted capabilities"),
+        ("policy", "inspect policy evaluation"),
+        ("pipeline", "open pipeline explorer"),
+        ("export", "write DecisionReport JSON"),
+        ("settings", "show settings status"),
+        ("help", "open keyboard help"),
+    ];
+    let mut lines = vec![Line::from(vec![
+        Span::styled(">/", Style::default().fg(theme::ORANGE).bg(theme::PANEL)),
+        Span::styled(
+            app.command_query.clone(),
+            Style::default().fg(theme::TEXT).bg(theme::PANEL),
+        ),
+    ])];
+    lines.push(Line::from(""));
+    for (command, description) in commands
+        .iter()
+        .filter(|(command, _)| query.is_empty() || command.contains(query.as_str()))
+        .take(8)
+    {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{:<14}", command),
+                Style::default().fg(theme::TEXT).bg(theme::PANEL),
+            ),
+            Span::styled(
+                *description,
+                Style::default().fg(theme::MUTED).bg(theme::PANEL),
+            ),
+        ]));
+    }
+
+    let paragraph = Paragraph::new(lines)
         .block(
             Block::default()
-                .title(" Search ")
+                .title(" Command ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(theme::PURPLE).bg(theme::PANEL))
                 .style(theme::panel()),
         )
-        .style(theme::panel());
-    frame.render_widget(Clear, search_area);
-    frame.render_widget(paragraph, search_area);
+        .style(theme::panel())
+        .wrap(Wrap { trim: false });
+    frame.render_widget(Clear, palette_area);
+    frame.render_widget(paragraph, palette_area);
 }
 
 fn draw_help(frame: &mut Frame<'_>, area: Rect) {
@@ -411,18 +519,22 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         )]),
         Line::from(""),
-        kv("Up / Down", "move through pipeline".into()),
-        kv("Left / Right", "switch focused panel".into()),
-        kv("Tab / Shift+Tab", "next or previous stage".into()),
-        kv("Enter", "run replay from existing DecisionReport".into()),
-        kv("/", "search stage or report text".into()),
+        kv("/", "open command palette".into()),
+        kv("/details", "open decision explorer".into()),
+        kv("Up / Down", "move through pipeline in details".into()),
+        kv("Left / Right", "switch focused panel in details".into()),
+        kv(
+            "Tab / Shift+Tab",
+            "next or previous stage in details".into(),
+        ),
+        kv("Enter", "evaluate prompt or replay details".into()),
         kv("r", "re-run evaluation".into()),
         kv("e", "export DecisionReport JSON".into()),
         kv("?", "toggle help".into()),
         kv("q", "quit".into()),
         Line::from(""),
         Line::from(vec![Span::styled(
-            "Esc closes search or stops replay.",
+            "Esc closes overlays or returns from details to recommendation.",
             Style::default().fg(theme::MUTED).bg(theme::PANEL),
         )]),
     ];

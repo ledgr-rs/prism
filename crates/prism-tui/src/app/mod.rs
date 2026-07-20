@@ -57,6 +57,13 @@ pub enum Panel {
     Details,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum View {
+    Prompt,
+    Recommendation,
+    Details,
+}
+
 #[derive(Debug, Clone)]
 pub struct ReplayState {
     pub active: bool,
@@ -80,11 +87,12 @@ pub struct App {
     pub report: Option<DecisionReport>,
     pub models: Vec<ModelProfile>,
     pub policy: Policy,
+    pub view: View,
     pub selected_stage: usize,
     pub active_panel: Panel,
     pub should_quit: bool,
-    pub search_open: bool,
-    pub search_query: String,
+    pub command_open: bool,
+    pub command_query: String,
     pub help_open: bool,
     pub replay: ReplayState,
     pub status: String,
@@ -104,14 +112,15 @@ impl App {
                 name: "Default deterministic policy".into(),
                 rules: Vec::new(),
             },
-            selected_stage: 0,
+            view: View::Prompt,
+            selected_stage: Stage::Recommendation as usize,
             active_panel: Panel::Workspace,
             should_quit: false,
-            search_open: false,
-            search_query: String::new(),
+            command_open: false,
+            command_query: String::new(),
             help_open: false,
             replay: ReplayState::new(),
-            status: "Enter a prompt and press Enter to evaluate.".into(),
+            status: "Enter a prompt and press Enter to evaluate. Press / for commands.".into(),
             last_eval: None,
             export_path: None,
             error: None,
@@ -136,34 +145,54 @@ impl App {
             return;
         }
 
-        if self.search_open {
-            self.handle_search_key(key);
+        if self.command_open {
+            self.handle_command_key(key);
             return;
         }
 
         match key.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Char('?') => self.help_open = true,
-            KeyCode::Char('/') if self.report.is_some() => {
-                self.search_open = true;
-                self.search_query.clear();
-                self.status = "Search open. Type a stage name or text from the report.".into();
+            KeyCode::Char('/') => {
+                self.command_open = true;
+                self.command_query.clear();
+                self.status = "Command palette open.".into();
             }
             KeyCode::Char('r') if self.report.is_some() => self.evaluate(),
             KeyCode::Char('e') if self.report.is_some() => self.export_report(),
-            KeyCode::Enter if self.report.is_none() => self.evaluate(),
-            KeyCode::Enter if self.report.is_some() => self.start_replay(),
-            KeyCode::Up if self.report.is_some() => self.previous_stage(),
-            KeyCode::Down if self.report.is_some() => self.next_stage(),
-            KeyCode::Left if self.report.is_some() => self.previous_panel(),
-            KeyCode::Right if self.report.is_some() => self.next_panel(),
-            KeyCode::Tab if self.report.is_some() => self.next_stage(),
-            KeyCode::BackTab if self.report.is_some() => self.previous_stage(),
+            KeyCode::Enter if self.view == View::Prompt => self.evaluate(),
+            KeyCode::Enter if self.view == View::Details && self.report.is_some() => {
+                self.start_replay()
+            }
+            KeyCode::Up if self.view == View::Details && self.report.is_some() => {
+                self.previous_stage()
+            }
+            KeyCode::Down if self.view == View::Details && self.report.is_some() => {
+                self.next_stage()
+            }
+            KeyCode::Left if self.view == View::Details && self.report.is_some() => {
+                self.previous_panel()
+            }
+            KeyCode::Right if self.view == View::Details && self.report.is_some() => {
+                self.next_panel()
+            }
+            KeyCode::Tab if self.view == View::Details && self.report.is_some() => {
+                self.next_stage()
+            }
+            KeyCode::BackTab if self.view == View::Details && self.report.is_some() => {
+                self.previous_stage()
+            }
+            KeyCode::Esc if self.view == View::Details => {
+                self.replay.active = false;
+                self.view = View::Recommendation;
+                self.status =
+                    "Returned to recommendation. Press /details to inspect the decision.".into();
+            }
             KeyCode::Esc if self.report.is_some() => {
                 self.replay.active = false;
-                self.status = "Replay stopped.".into();
+                self.status = "Press /details to inspect the decision.".into();
             }
-            _ if self.report.is_none() => self.handle_prompt_key(key),
+            _ if self.view == View::Prompt => self.handle_prompt_key(key),
             _ => {}
         }
     }
@@ -220,55 +249,73 @@ impl App {
         }
     }
 
-    fn handle_search_key(&mut self, key: KeyEvent) {
+    fn handle_command_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
-                self.search_open = false;
-                self.status = "Search closed.".into();
+                self.command_open = false;
+                self.status = "Command palette closed.".into();
             }
             KeyCode::Enter => {
-                self.apply_search();
-                self.search_open = false;
+                self.apply_command();
+                self.command_open = false;
             }
             KeyCode::Backspace => {
-                self.search_query.pop();
+                self.command_query.pop();
             }
             KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.search_query.push(ch);
-                self.apply_search();
+                self.command_query.push(ch);
             }
             _ => {}
         }
     }
 
-    fn apply_search(&mut self) {
-        if self.search_query.trim().is_empty() {
-            return;
-        }
-
-        let query = self.search_query.to_lowercase();
-        if let Some(index) = Stage::ALL
-            .iter()
-            .position(|stage| stage.label().to_lowercase().contains(&query))
-        {
-            self.selected_stage = index;
-            self.status = format!("Search matched {}.", Stage::ALL[index].label());
-            return;
-        }
-
-        if let Some(report) = &self.report {
-            let haystack = format!(
-                "{} {} {}",
-                report.prompt.text,
-                report.recommendation.model.identity.name,
-                report.explanation.summary
-            )
+    fn apply_command(&mut self) {
+        let command = self
+            .command_query
+            .trim()
+            .trim_start_matches('/')
             .to_lowercase();
-            if haystack.contains(&query) {
-                self.selected_stage = Stage::Explanation as usize;
-                self.status = "Search matched report text.".into();
+        if command.is_empty() {
+            return;
+        }
+
+        match command.as_str() {
+            "details" | "pipeline" => self.open_details(Stage::Recommendation),
+            "models" => self.open_details(Stage::ModelRegistry),
+            "capabilities" => self.open_details(Stage::CapabilityExtraction),
+            "policy" => self.open_details(Stage::PolicyEvaluation),
+            "export" => self.export_report(),
+            "settings" => {
+                self.status = "Settings are not configurable in this build.".into();
+            }
+            "help" => {
+                self.help_open = true;
+                self.status = "Help open.".into();
+            }
+            other => {
+                if let Some(stage) = Stage::ALL
+                    .iter()
+                    .copied()
+                    .find(|stage| stage.label().to_lowercase().contains(other))
+                {
+                    self.open_details(stage);
+                } else {
+                    self.status = format!("Unknown command: /{other}");
+                }
             }
         }
+    }
+
+    fn open_details(&mut self, stage: Stage) {
+        if self.report.is_none() {
+            self.status = "Evaluate a prompt before opening decision details.".into();
+            return;
+        }
+
+        self.view = View::Details;
+        self.selected_stage = stage as usize;
+        self.active_panel = Panel::Pipeline;
+        self.status = "Decision explorer open. Esc returns to the recommendation.".into();
     }
 
     fn evaluate(&mut self) {
@@ -291,10 +338,12 @@ impl App {
             Ok(report) => {
                 self.last_eval = Some(start.elapsed());
                 self.report = Some(report);
-                self.selected_stage = Stage::Prompt as usize;
-                self.active_panel = Panel::Pipeline;
+                self.view = View::Recommendation;
+                self.selected_stage = Stage::Recommendation as usize;
+                self.active_panel = Panel::Workspace;
                 self.replay.active = false;
-                self.status = "Evaluation complete. Use arrows, Tab, Enter, /, e, ?, q.".into();
+                self.status =
+                    "Recommendation ready. Press /details to inspect the decision.".into();
             }
             Err(err) => {
                 self.error = Some(err.to_string());
@@ -305,6 +354,7 @@ impl App {
 
     fn export_report(&mut self) {
         let Some(report) = &self.report else {
+            self.status = "Evaluate a prompt before exporting a DecisionReport.".into();
             return;
         };
 
